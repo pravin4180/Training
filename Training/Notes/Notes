@@ -54,5 +54,8 @@ ansible -i hosts containername1,containername2 -m ping
 To run a playbook
 ansible-playbook -i hosts ping.yml
 
+To check the setup module, to check the log
+ansible -i ../hosts ubuntu1 -m setup | grep distri
 
-
+To run a service in the target container using adhoc ansible command:
+ansible -i hosts all -m shell -a  "service nginx status"
