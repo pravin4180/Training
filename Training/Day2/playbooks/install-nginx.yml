@@ -4,3 +4,7 @@
   tasks:
     - name: Install nginx web server
       apt: name=nginx state=latest update_cache=yes 
+
+    - name: Start nginx Server
+      #service: name=nginx state=started enabled=yes
+      command: service nginx start

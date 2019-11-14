@@ -32,7 +32,7 @@ ssh-keygen
 Create the container with the custom image:
 docker run -d --name ubuntu1 --hostname ubuntu1 -p 8001:80 -p 2001:22 boa/ansible-ubuntu
 
-
+nsible_distribution
 To ssh into the container:
 ssh -p 2001 root@localhost
 
@@ -54,8 +54,47 @@ ansible -i hosts containername1,containername2 -m ping
 To run a playbook
 ansible-playbook -i hosts ping.yml
 
-To check the setup module, to check the log
+To check the setup module, to check the log, to check the ansible distribution
 ansible -i ../hosts ubuntu1 -m setup | grep distri
 
 To run a service in the target container using adhoc ansible command:
 ansible -i hosts all -m shell -a  "service nginx status"
+
+To view the IP address in single command
+docker inspect containername | grep IPA
+docker inspect -f {{.NetworkSettings.IPAddress}} containername
+
+
+To cut the lines in vim
+dd
+to cut n number of lines,
+ndd
+
+To paste y
+
+To split a file into another file,
+:split filneam
+vertical split
+:vsplit filename
+
+To switch between files,
+Ctrl+ww
+
+To undo,
+Esc and U
+
+To redo
+Esc and R
+
+
+To save,
+:w
+
+TO save and exit 
+:wq
+
+To exit without saving
+:q
+
+
+All things about ansible are available in /etc/ansible/ansible.cfg
