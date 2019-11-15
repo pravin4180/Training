@@ -6,4 +6,4 @@
   tasks:
     - include: "install-nginx-{{ansible_distribution|lower}}.yml"
     - include: "configure-nginx-{{ansible_distribution|lower}}.yml"
-    - include: common-nginx.yml      
+    - include: common-nginx-tasks.yml      
