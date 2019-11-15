@@ -1,0 +1,103 @@
+git init --> creates empty git repository
+
+git add * --> Stage the files to git staging area
+
+
+git commit -m "Initial Commit" > Commits the changes to the locl git repository
+
+git log --> shows the logs of activities happened in git
+
+
+Your name and email address were configured automatically based
+on your username and hostname. Please check that they are accurate.
+You can suppress this message by setting them explicitly:
+
+    git config --global user.name "Your Name"
+    git config --global user.email you@example.com
+
+After doing this, you may fix the identity used for this commit with:
+
+    git commit --amend --reset-author
+
+
+git remote add origin https://github.com/pravin4180/devops-chennai.git --> This will mark the origin as the repository url
+
+THe below command will push the files to the repository
+[rps@localhost Training]$ git push -u origin master
+Username for 'https://github.com': pravin4180@gmail.com
+Password for 'https://pravin4180@gmail.com@github.com': 
+
+
+TO start ansible
+java  -jar jenkins.war
+
+
+http://192.168.12.163:8081/artifactory/boa-maven
+
+
+<url>http://192.168.12.163:8081/artifactory/boa-maven</url>
+
+JFrog:
+Get a free trial from jfrog website
+
+run the docker command to create image
+
+docker pull docker.bintray.io/jfrog/artifactory-pro:latest
+
+Create the docker container with the above image
+
+
+docker run --name jfrog --hostname jfrog -p -d 8081:8081 docker.bintray.io/jfrog/artifactory-pro
+
+Once done, add the maven related entries
+
+vim ~/.bashrc --> 	
+
+export JAVA_HOME=/usr/lib/jvm/java-1.8.0-openjdk-1.8.0.232.b09-0.el7_7.x86_64
+export M2_HOME=/opt/apache-maven-3.6.2
+export PATH=$JAVA_HOME/bin:$M2_HOME/bin:$PATH
+
+In Jenkins,
+
+add the above entries and also the below
+
+mvn clean install
+
+
+XLR:
+Create a folder in Design
+Then created Task
+Then configure in Settings
+Settings --> Shared configurations --> Configure Git, Jenkins, Host
+
+Then create release under the task and start the release
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
