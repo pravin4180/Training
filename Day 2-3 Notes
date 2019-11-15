@@ -1,0 +1,391 @@
+Day - 2
+
+Trainer Github
+
+https://github.com/tektutor/ubuntu-ansible -- for SSH
+
+
+portforwarding -- to access the web public..
+
+stop the container --- docker stop $(docker ps -q)
+remove the container --- docker rm $(docker ps -aq)
+docker ps --- showes all the running container
+docker ps -aq --- show all the container 
+Force kill the container --- docker rm -f $(docker ps -aq)
+
+
+######Ansible Script to install SSH, Python and GIT
+
+FROM ubuntu:16.04
+MAINTAINER Deva
+
+RUN apt-get update && apt-get install -y openssh-server python-minimal git
+RUN mkdir /var/run/sshd
+RUN echo 'root:root' | chpasswd
+RUN sed -i 's/PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config
+
+# SSH login fix. Otherwise user is kicked off after login
+RUN sed 's@session\s*required\s*pam_loginuid.so@session optional pam_loginuid.so@g' -i /etc/pam.d/sshd
+RUN mkdir -p /root/.ssh
+COPY authorized_keys /root/.ssh/authorized_keys
+
+EXPOSE 22
+EXPOSE 80 
+CMD ["/usr/sbin/sshd", "-D"]
+
+
+################
+
+Generate SSH key using below command
+ssh-keygen 
+enter and enter
+
+now copy the public key 
+cp /home/rps/.ssh/id_rsa.pub authorized_keys
+
+##############
+
+#build the image
+
+docker build -t boa/ansible-ubuntu .
+
+#create the docker container
+
+docker run -d --name ubuntu1 --hostname ubuntu1 -p 8001:80 -p 2001:22 boa/ansible-ubuntu
+docker run -d --name ubuntu2 --hostname ubuntu2 -p 8002:80 -p 2002:22 boa/ansible-ubuntu
+
+
+#Now connect using SSH from local machine to docker container
+
+ssh -p 2001 root@localhost
+
+#Now create the host file and enter the docker container machine names
+
+[all]
+ubuntu1 ansible_host=localhost ansible_user=root ansible_port=2001 ansible_private_key_file=/home/rps/.ssh/id_rsa
+ubuntu2 ansible_host=localhost ansible_user=root ansible_port=2002 anisble_private_key_file=/home/rps/.ssh/id_rsa
+
+#Another way of Host entry
+
+[all]
+ubuntu1 ansible_port=2001
+ubuntu2 ansible_port=2002
+
+[all:vars]
+ansible_host-localhost
+ansible_user=root
+anisble_private_key_file=/home/rps/.ssh/id_rsa
+ansible_become_user=root
+ansible_become_password=root
+
+#Execute the ping command
+
+ansible -i hosts all -m ping
+
+#Host file group are seperated with [] braces along with the names. Eg all , Dev Machines, SIT Machines, PROD Machines
+
+#Play book
+
+[rps@localhost playbook]$ cat ping.yml 
+- name: This playbook will ping docker containers
+  hosts: all
+  tasks: 
+    - name: ping the container
+      ping:
+
+
+#Playbook with ngx and load balancer
+
+- name: this playbook will install, configure and deploy web pages into nginx
+  hosts: all
+  become: yes
+  tasks:
+    - name: Install nginx webserver
+      apt: name=nginx state=latest update_cache=yes
+
+
+#Executing the playbook
+
+ansible-playbook -i hosts install-nginx.yml
+
+********************************************************************
+
+Day3
+
+created the day3 folder and copied day2 host and njinx files
+
+now started the nginx and hit the url to see the nginx is up 
+
+http://localhost:8002/
+http://localhost:8001/
+
+
+Now we are able to see the home page welcome to nginx
+
+Now create the HTML file in the name of "index.html.j2"
+
+<html>
+       <head>
+              <title>{{course_name}}</title>
+       </head>
+       <boday>
+              <hl>Hostname is {{ansible_hostname}}</h1>
+       </body>
+</html>
+
+
+## modifed playbook to deploy the custome web page
+
+- name: this playbook will install, configure and deploy web pages into nginx
+  hosts: all
+  become: yes
+  vars:
+    - course_name: DevOps with Ansible, XLR, Jenkins & Docker
+  tasks:
+    - name: Install nginx webserver
+      apt: name=nginx state=latest update_cache=yes
+
+    - name: start the nginx web server
+      #service: name=nginx start=started enabled=yes
+      command: service nginx start
+
+    - name: Deploy Custom web page into nginx web server on the container
+      template: src=index.html.j2 dest=/var/www/html/index.html
+
+
+#Now going to see the copy task
+on Day 3 foldey execute the below command to copy the file
+
+docker cp ubuntu1:/etc/nginx/sites-available/default .
+
+#modify the default file "root /var/html; from "root /var/www/html;
+
+Also Modify the play book to Install , create the root, configure, Deploy and Restart
+
+- name: this playbook will install, configure and deploy web pages into nginx
+  hosts: appservers
+  become: yes
+  vars:
+    - course_name: DevOps with Ansible, XLR, Jenkins & Docker
+  tasks:
+    - name: Install nginx webserver
+      apt: name=nginx state=latest update_cache=yes
+  
+    - name: Create nginx web root folder
+      file: path=/var/html mode=0777 state=directory
+
+    - name: Congifure nginx web root folder
+      copy: src=default dest=/etc/nginx/sites-available/default
+
+    - name: Deploy Custom web page into nginx web server on the container
+      template: src=index.html.j2 dest=/var/html/index.html
+
+    - name: Restart the nginx web server
+      #service: name=nginx start=restarted enabled=yes
+      command: service nginx restart
+
+
+Execute the playbook 
+
+
+Load Balancing concept (changes in host file see below):
+
+#Copy the same Nginx playbook with lb for referance - install-nginx-lb.yml
+
+- name: this playbook will install, configure as load balancer
+  hosts: gateway
+  become: yes
+  tasks:
+    - name: Install nginx webserver
+      apt: name=nginx state=latest update_cache=yes
+
+    - name: Congifure nginx web root folder
+      copy: src=default-lb dest=/etc/nginx/nginx.conf
+
+    - name: Restart the nginx web server
+      command: service nginx restart
+
+
+#Create the new container for load balancing setup
+
+docker run -d --name lb --hostname lb -p 80:80 -p 2003:22 boa/ansible-ubuntu
+
+#Latest host file with changes in Group name:
+
+[all]
+ubuntu1 ansible_port=2001
+ubuntu2 ansible_port=2002
+lb      ansible_port=2003
+
+[all:vars]
+ansible_host=localhost
+ansible_user=root
+anisble_private_key_file=/home/rps/.ssh/id_rsa
+ansible_become_user=root
+ansible_become_password=root
+
+[appservers]
+ubuntu[1:2]
+
+[gateway]
+lb
+
+#step to configure load balancing using nginx:
+
+user www-data;
+worker_processes auto;
+pid /run/nginx.pid;
+
+events {
+	worker_connections 768;
+	# multi_accept on;
+}
+
+http{
+   upstream backend {
+      server 172.17.0.2;
+      server 172.17.0.3;
+   }
+
+   # This server accepts all traffic to port 80 and passes it to the upstream.
+   # Notice that the upstream name and the proxy_pass need to match.
+
+   server {
+      listen 80;
+
+      location / {
+          proxy_pass http://backend;
+      }
+   }
+}
+
+
+# Hit the below command to make sure it is routing to ubuntu 1 and 2
+curl http://172.17.0.4
+
+
+#so far we completed the task with ubuntu now we are going to use centos to feel the difference
+
+
+### Download the centos using below link 
+
+https://github.com/tektutor/centos-sshd-passwordless 
+
+open the Dockerfile do the 3 changes ----> delete the 2 lines except root , add git, change the permission to 744
+
+
+#Host for Centos -added centos
+
+[all]
+ubuntu1 ansible_port=2001
+ubuntu2 ansible_port=2002
+centos1 ansible_port=2004
+centos2 ansible_port=2005
+lb ansible_port=2003
+
+[all:vars]
+ansible_host=localhost
+ansible_user=root
+anisble_private_key_file=/home/rps/.ssh/id_rsa
+ansible_become_user=root
+ansible_become_password=root
+
+[appservers]
+ubuntu[1:2]
+centos[1:2]
+[gateway]
+lb
+
+#get the centos IP
+
+docker inspect -f {{.NetworkSettings.IPAddress}} centos1
+server 172.17.0.5
+docker inspect -f {{.NetworkSettings.IPAddress}} centos2
+server 172.17.0.6
+
+#Add the centos ip in default-lb
+
+user www-data;
+worker_processes auto;
+pid /run/nginx.pid;
+
+events {
+        worker_connections 768;
+        # multi_accept on;
+}
+http{
+   upstream backend {
+      server 172.17.0.2;
+      server 172.17.0.3;
+      server 172.17.0.5;
+      server 172.17.0.6;
+   }
+
+   # This server accepts all traffic to port 80 and passes it to the upstream.
+   # Notice that the upstream name and the proxy_pass need to match.
+
+   server {
+      listen 80;
+
+      location / {
+          proxy_pass http://backend;
+      }
+   }
+}
+
+#open the install-nginx.ymlansible-playbook -i host install-nginx.yml
+ file with centos command
+
+- name: this playbook will install, configure and deploy web pages into nginx
+  hosts: appservers
+  become: yes
+  vars:
+    - course_name: DevOps with Ansible, XLR, Jenkins & Docker
+  tasks:
+    - name: Install nginx webserve in ubuntu
+      apt: name=nginx state=latest update_cache=yes
+      when: ( ansible_distribution == "Ubuntu" and ansible_os_family == "Debian" )
+
+    - name: Install Extra Packages for Enterprise Linux in centos
+      yum: name=epel-release state=latest
+      when: ( ansible_distribution == "CentOS" and ansible_os_family == "RedHat" )
+
+    - name: Enable baseurl and disable mirror link in the epel repos under CentOS
+      copy: src=epel.repo dest=/etc/yum.repos.d/epel.repo
+      when: ( ansible_distribution == "CentOS" and ansible_os_family == "RedHat" )
+
+    - name: Install nginx web server in CentOS
+      yum: name=nginx state=latest
+      when: ( ansible_distribution == "CentOS" and ansible_os_family == "RedHat" )
+
+    - name: Create nginx web root folder
+      file: path=/var/html mode=0777 state=directory
+
+    - name: Congifure nginx web root folder
+      copy: src=default dest=/etc/nginx/sites-available/default
+      when: ( ansible_distribution == "Ubuntu" and ansible_os_family == "Debian" )
+
+    - name: Deploy Custom web page into nginx web server on the container
+      template: src=index.html.j2 dest=/var/html/index.html
+
+    - name: Restart the nginx web server
+      #service: name=nginx start=restarted enabled=yes
+      command: service nginx restart
+
+
+#copy epel.repo from below command
+
+docker cp centos1:/etc/yum.repos.d/epel.repo .
+
+#open the epel.repo and uncomment the base url and comment the mirror url
+
+#copy the default.conf file for centos into day3 folder and change the 
+
+    # Load configuration files for the default server block.
+    include /etc/nginx/default.d/*.conf;
+
+
+
+
+
+
