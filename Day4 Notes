@@ -1,0 +1,196 @@
+Day 4
+
+Create a folder day 4 and copy the files from day3
+
+#split the playbook install-nginx.yml, open the file
+
+use command 3dd or 4 dd to cut the required lines and use the below command
+
+esc->:split install-nginx-ubuntu.yml
+
+then type 3pp or 4 pp to copy the deleted lines
+
+ctl->>ww will move the cursor to the other splitted files
+
+### we need to seperate the install , configure, for ubuntu and centos and also common task and Vars by creating the seperate yml file to have the decent code.
+
+below floder shows the files create seperately
+
+[rps@localhost day4]$ ll
+total 56
+-rw-rw-r--. 1 rps rps  365 Nov 14 11:02 common-nginx-tasks.yml
+-rw-rw-r--. 1 rps rps  203 Nov 14 10:46 configure-nginx-centos.yml
+-rw-rw-r--. 1 rps rps  202 Nov 14 10:46 configure-nginx-ubuntu.yml
+-rw-r--r--. 1 rps rps 2070 Nov 14 10:04 default
+-rw-r--r--. 1 rps rps  439 Nov 14 10:04 default.conf
+-rw-rw-r--. 1 rps rps  502 Nov 14 10:04 default-lb
+-rw-r--r--. 1 rps rps  957 Nov 14 10:40 epel.repo
+-rw-rw-r--. 1 rps rps  336 Nov 14 10:04 hosts
+-rw-rw-r--. 1 rps rps  175 Nov 14 10:38 index.html.j2
+-rw-rw-r--. 1 rps rps  582 Nov 14 10:28 install-nginx-centos.yml
+-rw-rw-r--. 1 rps rps  379 Nov 14 10:04 install-nginx-lb.yml
+-rw-rw-r--. 1 rps rps  180 Nov 14 10:34 install-nginx-ubuntu.yml
+-rw-rw-r--. 1 rps rps  391 Nov 14 11:08 install-nginx.yml
+-rw-rw-r--. 1 rps rps   63 Nov 14 11:02 nginx-vars.yml
+
+
+#common-nginx-tasks.yml
+
+    - name: Create nginx web root folder
+      file: path=/var/html mode=0777 state=directory
+
+    - name: Deploy Custom web page into nginx web server on the container
+      template: src=index.html.j2 dest=/var/html/index.html
+
+    - name: Restart the nginx web server
+      #service: name=nginx start=restarted enabled=yes
+      command: service nginx restart
+
+#configure-nginx-centos.yml
+
+   - name: Create nginx web root folder
+      file: path=/var/html mode=0777 state=directory
+
+    - name: Deploy Custom web page into nginx web server on the container
+      template: src=index.html.j2 dest=/var/html/index.html
+
+    - name: Restart the nginx web server
+      #service: name=nginx start=restarted enabled=yes
+      command: service nginx restart
+[rps@localhost day4]$ vim /etc/ansible/ansible.cfg
+[rps@localhost day4]$ cat configure-nginx-centos.yml
+
+    - name: Congifure nginx web root folder in CentOS
+      copy: src=default.conf dest=/etc/nginx/conf.d/default.conf
+      when: ( ansible_distribution == "CentOS" and ansible_os_family == "RedHat" )
+
+#configure-nginx-ubuntu.yml
+
+    - name: Congifure nginx web root folder in Ubuntu
+      copy: src=default dest=/etc/nginx/sites-available/default
+      when: ( ansible_distribution == "Ubuntu" and ansible_os_family == "Debian" )
+
+#install-nginx-centos.yml
+
+    - name: Install Extra Packages for Enterprise Linux in centos
+      yum: name=epel-release state=latest
+      when: ( ansible_distribution == "CentOS" and ansible_os_family == "RedHat" )
+
+    - name: Enable baseurl and disable mirror link in the epel repos under CentOS
+      copy: src=epel.repo dest=/etc/yum.repos.d/epel.repo
+      when: ( ansible_distribution == "CentOS" and ansible_os_family == "RedHat" )
+
+    - name: Install nginx web server in CentOS
+      yum: name=nginx state=latest
+      when: ( ansible_distribution == "CentOS" and ansible_os_family == "RedHat" )
+
+
+#install-nginx-ubuntu.yml
+
+    - name: Install nginx webserve in ubuntu
+      apt: name=nginx state=latest update_cache=yes
+      when: ( ansible_distribution == "Ubuntu" and ansible_os_family == "Debian" )
+
+
+#install-nginx.yml
+
+  - name: this playbook will install, configure and deploy web pages into nginx
+    hosts: appservers
+    become: yes
+    vars_files:
+    - nginx-vars.yml
+
+    tasks:
+
+      - include: install-nginx-ubuntu.yml
+      - include: install-nginx-centos.yml
+
+      - include: configure-nginx-ubuntu.yml
+      - include: configure-nginx-centos.yml
+
+      - include: common-nginx-tasks.yml
+
+
+#nginx-vars.yml
+
+    - course_name: DevOps with Ansible, XLR, Jenkins & Docker
+
+
+### Now going to fix the ansible error that comes while executing the playbook
+
+vim /etc/ansible/ansible.cfg
+
+***********************
+
+#Now in the play book we can simplify it more by removing the OS names and change to the below one
+
+  - name: this playbook will install, configure and deploy web pages into nginx
+    hosts: appservers
+    become: yes
+    vars_files:
+    - nginx-vars.yml
+
+    tasks:
+
+      - include: "install-nginx-{{ansible_distribution|lower}}.yml"
+      - include: "configure-nginx-{{ansible_distribution|lower}}.yml"
+      - include: common-nginx-tasks.yml
+
+
+This ansible_distribution variable will get the machines or host from appservers given in the inventory line -- hosts: appservers
+
+#Provisioning to start container using play book.
+#install pip before executing the playbook
+
+sudo yum install python_pip
+pip install docker-py
+
+- name: This play book will provision docker containers
+   hosts: localhost
+   tasks:
+     - name: Delete any containers that are already running
+       shell: docker rm -f $(docker ps -aq)
+       ignore_errors: yes
+
+     - name: Create Ububtu Containers
+       docker_container:
+         name: "ubuntu{{item}}"
+         image: boa/ansible-ubuntu
+         state: started
+         ports:
+          - "800{{item}}:80"
+          - "200{{item}}:22"
+       with_sequence: start=1 end=4
+
+     - name: Create centos Containers
+       docker_container:
+         name: "centos{{item}}"
+         image: boa/ansible-centos
+         state: started
+         ports:
+           - "900{{item}}:80"
+           - "300{{item}}:22"
+       with_sequence: start=1 end=4
+
+
+
+Maven Build Tool:
+
+ear = combination of many ear and war files
+jar = stand alone application
+
+Maven is a build tool --- pom.xml file
+
+creating the pom.xml
+
+
+
+
+
+
+
+
+
+
+
+
